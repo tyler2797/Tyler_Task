@@ -307,6 +307,12 @@ async def parse_message(request: ParseMessageRequest):
     return await parse_natural_language_message(request.message)
 
 
+@api_router.post("/chat", response_model=ChatResponse)
+async def chat_assistant(request: ChatRequest):
+    """Assistant IA conversationnel intelligent pour les utilisateurs TDAH"""
+    return await intelligent_chat_assistant(request.message, request.conversation_history)
+
+
 @api_router.post("/reminders", response_model=Reminder)
 async def create_reminder(reminder: ReminderCreate):
     """Créer un nouveau rappel"""
