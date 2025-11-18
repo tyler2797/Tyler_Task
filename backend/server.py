@@ -34,6 +34,21 @@ logging.basicConfig(
 logger = logging.getLogger(__name__)
 
 
+# Database initialization
+async def init_db_indexes():
+    """Initialize database indexes on startup"""
+    try:
+        # Create unique index on 'id' field
+        await db.reminders.create_index([("id", 1)], unique=True)
+        # Create index on 'datetime_iso' for sorting
+        await db.reminders.create_index([("datetime_iso", 1)])
+        # Create compound index for filtered queries
+        await db.reminders.create_index([("status", 1), ("datetime_iso", 1)])
+        logger.info("✅ Database indexes initialized successfully")
+    except Exception as e:
+        logger.warning(f"Index creation warning (may already exist): {str(e)}")
+
+
 # Helper function to convert ObjectId
 def str_object_id(obj):
     if isinstance(obj, dict):
