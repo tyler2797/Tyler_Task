@@ -96,6 +96,16 @@ class ReminderUpdate(BaseModel):
     status: Optional[str] = None
     recurrence: Optional[str] = None
 
+class ChatRequest(BaseModel):
+    message: str
+    conversation_history: Optional[List[dict]] = []
+
+class ChatResponse(BaseModel):
+    response: str
+    type: str  # "question", "suggestion", "confirmation", "multiple_tasks"
+    suggestions: Optional[List[str]] = None
+    parsed_reminders: Optional[List[ParsedReminder]] = None
+
 
 # NLU Parsing Service
 async def parse_natural_language_message(message: str) -> ParsedReminder:
