@@ -90,34 +90,45 @@ async def parse_natural_language_message(message: str) -> ParsedReminder:
         if not llm_key:
             raise ValueError("EMERGENT_LLM_KEY not found in environment")
         
-        system_prompt = """Tu es un assistant spécialisé dans l'extraction d'informations de rappels depuis des messages en français.
-Tu dois extraire: titre, description optionnelle, date, heure, et déterminer si le message est ambigu.
+        from datetime import datetime, timedelta
+        import json
+        
+        today = datetime.now()
+        today_str = today.strftime("%A %d %B %Y")  # e.g., "lundi 18 novembre 2024"
+        now_str = today.strftime("%H:%M")
+        
+        system_prompt = f"""Tu es un assistant spécialisé dans l'extraction d'informations de rappels depuis des messages en français.
 
-Date du jour: {today}
-Heure actuelle: {now}
+CONTEXTE TEMPOREL:
+- Aujourd'hui: {today_str}
+- Heure actuelle: {now_str}
+- Année: {today.year}
 
-Règles importantes:
-1. Si la date/heure n'est pas claire, marque is_ambiguous=true et explique pourquoi
-2. Convertis les dates relatives ("demain", "dans 2 jours", "lundi prochain") en dates absolues
-3. Si l'heure n'est pas spécifiée, marque is_ambiguous=true
-4. Utilise le format ISO 8601 pour datetime_iso
-5. Le timezone par défaut est Europe/Paris
+INSTRUCTIONS:
+1. Extrais le titre du rappel (l'action principale)
+2. Extrais la description si présente (détails optionnels)
+3. Convertis TOUTES les dates relatives en dates absolues (format: YYYY-MM-DD)
+   - "demain" = {(today + timedelta(days=1)).strftime("%Y-%m-%d")}
+   - "dans 2 jours" = {(today + timedelta(days=2)).strftime("%Y-%m-%d")}
+4. Si l'heure est spécifiée, extrais-la au format HH:MM
+5. Si l'heure n'est PAS spécifiée, marque is_ambiguous=true
+6. Crée datetime_iso en combinant date et heure au format ISO 8601 avec timezone +01:00
 
-Réponds UNIQUEMENT avec un JSON valide au format:
-{
-  "title": "titre du rappel",
-  "description": "description optionnelle ou null",
-  "date": "YYYY-MM-DD ou null",
-  "time": "HH:MM ou null",
-  "datetime_iso": "YYYY-MM-DDTHH:MM:SS+01:00 ou null",
+RÉPONDS UNIQUEMENT AVEC UN OBJET JSON, SANS TEXTE AVANT OU APRÈS:"""
+        
+        user_prompt = f"""Message: "{message}"
+
+Retourne UN SEUL objet JSON avec cette structure exacte:
+{{
+  "title": "action principale",
+  "description": null,
+  "date": "YYYY-MM-DD",
+  "time": "HH:MM",
+  "datetime_iso": "YYYY-MM-DDTHH:MM:00+01:00",
   "timezone": "Europe/Paris",
   "is_ambiguous": false,
-  "ambiguity_reason": "raison si ambigu ou null"
-}"""
-        
-        today = datetime.now().strftime("%Y-%m-%d")
-        now = datetime.now().strftime("%H:%M")
-        system_prompt = system_prompt.format(today=today, now=now)
+  "ambiguity_reason": null
+}}"""
         
         chat = LlmChat(
             api_key=llm_key,
@@ -125,36 +136,34 @@ Réponds UNIQUEMENT avec un JSON valide au format:
             system_message=system_prompt
         ).with_model("openai", "gpt-4o-mini")
         
-        user_message = UserMessage(text=f"Message à parser: {message}")
+        user_message = UserMessage(text=user_prompt)
         response = await chat.send_message(user_message)
         
-        logger.info(f"LLM Response: {response}")
+        logger.info(f"LLM Raw Response: {response}")
         
         # Parse the JSON response
-        import json
         import re
         
-        # Clean the response if it contains markdown code blocks
         response_text = str(response).strip()
         
         # Remove markdown code blocks
-        if "```json" in response_text:
-            response_text = re.sub(r'```json\s*', '', response_text)
-        if "```" in response_text:
-            response_text = re.sub(r'```', '', response_text)
-        
+        response_text = re.sub(r'```json\s*', '', response_text)
+        response_text = re.sub(r'```\s*', '', response_text)
         response_text = response_text.strip()
         
         # Try to find JSON object in the response
-        json_match = re.search(r'\{.*\}', response_text, re.DOTALL)
+        json_match = re.search(r'\{[^{}]*(?:\{[^{}]*\}[^{}]*)*\}', response_text, re.DOTALL)
         if json_match:
             response_text = json_match.group(0)
         
-        logger.info(f"Cleaned response: {response_text}")
+        logger.info(f"Cleaned JSON: {response_text}")
         
         parsed_data = json.loads(response_text)
         return ParsedReminder(**parsed_data)
         
+    except json.JSONDecodeError as e:
+        logger.error(f"JSON decode error: {str(e)}, Response: {response_text}")
+        raise HTTPException(status_code=500, detail=f"Erreur de décodage JSON: {str(e)}")
     except Exception as e:
         logger.error(f"Error parsing message: {str(e)}")
         raise HTTPException(status_code=500, detail=f"Erreur lors du parsing: {str(e)}")
