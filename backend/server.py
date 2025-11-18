@@ -132,15 +132,25 @@ Réponds UNIQUEMENT avec un JSON valide au format:
         
         # Parse the JSON response
         import json
+        import re
+        
         # Clean the response if it contains markdown code blocks
-        response_text = response.strip()
-        if response_text.startswith("```json"):
-            response_text = response_text[7:]
-        if response_text.startswith("```"):
-            response_text = response_text[3:]
-        if response_text.endswith("```"):
-            response_text = response_text[:-3]
+        response_text = str(response).strip()
+        
+        # Remove markdown code blocks
+        if "```json" in response_text:
+            response_text = re.sub(r'```json\s*', '', response_text)
+        if "```" in response_text:
+            response_text = re.sub(r'```', '', response_text)
+        
         response_text = response_text.strip()
+        
+        # Try to find JSON object in the response
+        json_match = re.search(r'\{.*\}', response_text, re.DOTALL)
+        if json_match:
+            response_text = json_match.group(0)
+        
+        logger.info(f"Cleaned response: {response_text}")
         
         parsed_data = json.loads(response_text)
         return ParsedReminder(**parsed_data)
