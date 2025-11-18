@@ -194,6 +194,107 @@ Retourne UN SEUL objet JSON avec cette structure exacte:
         raise HTTPException(status_code=500, detail=f"Erreur lors du parsing: {str(e)}")
 
 
+# Intelligent Chatbot Service for ADHD users
+async def intelligent_chat_assistant(message: str, history: List[dict] = []) -> ChatResponse:
+    """Assistant IA conversationnel pour aider les utilisateurs TDAH"""
+    try:
+        llm_key = os.environ.get('EMERGENT_LLM_KEY')
+        if not llm_key:
+            raise ValueError("EMERGENT_LLM_KEY not found in environment")
+        
+        from datetime import datetime
+        import json
+        
+        today = datetime.now()
+        today_str = today.strftime("%A %d %B %Y")
+        now_str = today.strftime("%H:%M")
+        
+        system_prompt = f"""Tu es un assistant IA spécialisé pour aider les personnes avec TDAH à gérer leurs tâches.
+
+CONTEXTE TEMPOREL:
+- Aujourd'hui: {today_str}
+- Heure: {now_str}
+
+PERSONNALITÉ:
+- Ton humoristique et bienveillant
+- Empathique envers les défis du TDAH
+- Utilise des émojis occasionnellement
+- Ne juge jamais, encourage toujours
+
+COMPÉTENCES:
+1. Détecter si le message contient PLUSIEURS tâches → proposer de les diviser
+2. Poser des questions pour clarifier les détails manquants (date, heure, priorité)
+3. Faire des suggestions intelligentes basées sur le contexte
+4. Détecter l'urgence et proposer des rappels supplémentaires
+5. Proposer des stratégies anti-procrastination
+
+DÉTECTION DE TÂCHES MULTIPLES:
+Si le message contient plusieurs tâches (mots-clés: "et", "puis", "après", "aussi", liste avec virgules/tirets):
+- Type: "multiple_tasks"
+- Liste chaque tâche détectée
+- Propose de créer un rappel séparé pour chacune
+
+QUESTIONS CLARIFIANTES:
+Si info manquante (date OU heure):
+- Type: "question"
+- Pose UNE question à la fois
+- Suggestions: propose 3 options rapides
+
+ENCOURAGEMENT:
+- Type: "suggestion"
+- Félicite l'initiative
+- Propose des tips TDAH-friendly
+
+Réponds UNIQUEMENT en JSON:
+{{
+  "response": "ton message avec ton humoristique",
+  "type": "question|suggestion|confirmation|multiple_tasks",
+  "suggestions": ["option1", "option2", "option3"],
+  "parsed_reminders": [...]
+}}"""
+        
+        chat = LlmChat(
+            api_key=llm_key,
+            session_id=str(uuid.uuid4()),
+            system_message=system_prompt
+        ).with_model("openai", "gpt-4o-mini")
+        
+        # Construct conversation context
+        context = f"Message utilisateur: \"{message}\"\n\n"
+        if history:
+            context += "Historique récent:\n"
+            for h in history[-3:]:  # Last 3 messages
+                context += f"- {h.get('role', 'user')}: {h.get('content', '')}\n"
+        
+        user_message = UserMessage(text=context)
+        response = await chat.send_message(user_message)
+        
+        logger.info(f"Chat AI Response: {response}")
+        
+        # Parse JSON response
+        import re
+        response_text = str(response).strip()
+        response_text = re.sub(r'```json\s*', '', response_text)
+        response_text = re.sub(r'```\s*', '', response_text)
+        response_text = response_text.strip()
+        
+        json_match = re.search(r'\{[^{}]*(?:\{[^{}]*\}[^{}]*)*\}', response_text, re.DOTALL)
+        if json_match:
+            response_text = json_match.group(0)
+        
+        parsed_response = json.loads(response_text)
+        return ChatResponse(**parsed_response)
+        
+    except Exception as e:
+        logger.error(f"Chat assistant error: {str(e)}")
+        # Fallback response
+        return ChatResponse(
+            response="Oups, mon cerveau TDAH a bug! 😅 Peux-tu reformuler ta demande?",
+            type="question",
+            suggestions=None
+        )
+
+
 # API Routes
 @api_router.get("/")
 async def root():
