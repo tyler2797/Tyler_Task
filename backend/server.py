@@ -110,7 +110,7 @@ class ChatResponse(BaseModel):
     parsed_reminders: Optional[List[ParsedReminder]] = None
 
 
-# NLU Parsing Service
+# NLU Parsing Service with OpenAI
 async def parse_natural_language_message(message: str) -> ParsedReminder:
     """Parse a natural language message to extract reminder information"""
     try:
