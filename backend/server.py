@@ -202,96 +202,89 @@ async def intelligent_chat_assistant(message: str, history: List[dict] = []) -> 
         if not llm_key:
             raise ValueError("EMERGENT_LLM_KEY not found in environment")
         
-        from datetime import datetime
+        from datetime import datetime, timedelta
         import json
+        import re
         
         today = datetime.now()
         today_str = today.strftime("%A %d %B %Y")
         now_str = today.strftime("%H:%M")
         
-        system_prompt = f"""Tu es un assistant IA spécialisé pour aider les personnes avec TDAH à gérer leurs tâches.
-
-CONTEXTE TEMPOREL:
-- Aujourd'hui: {today_str}
-- Heure: {now_str}
-
-PERSONNALITÉ:
-- Ton humoristique et bienveillant
-- Empathique envers les défis du TDAH
-- Utilise des émojis occasionnellement
-- Ne juge jamais, encourage toujours
-
-COMPÉTENCES:
-1. Détecter si le message contient PLUSIEURS tâches → proposer de les diviser
-2. Poser des questions pour clarifier les détails manquants (date, heure, priorité)
-3. Faire des suggestions intelligentes basées sur le contexte
-4. Détecter l'urgence et proposer des rappels supplémentaires
-5. Proposer des stratégies anti-procrastination
-
-DÉTECTION DE TÂCHES MULTIPLES:
-Si le message contient plusieurs tâches (mots-clés: "et", "puis", "après", "aussi", liste avec virgules/tirets):
-- Type: "multiple_tasks"
-- Liste chaque tâche détectée
-- Propose de créer un rappel séparé pour chacune
-
-QUESTIONS CLARIFIANTES:
-Si info manquante (date OU heure):
-- Type: "question"
-- Pose UNE question à la fois
-- Suggestions: propose 3 options rapides
-
-ENCOURAGEMENT:
-- Type: "suggestion"
-- Félicite l'initiative
-- Propose des tips TDAH-friendly
-
-Réponds UNIQUEMENT en JSON:
-{{
-  "response": "ton message avec ton humoristique",
-  "type": "question|suggestion|confirmation|multiple_tasks",
-  "suggestions": ["option1", "option2", "option3"],
-  "parsed_reminders": [...]
-}}"""
+        # Detect multiple tasks first
+        task_indicators = ['et', ',', 'puis', 'après', 'ensuite', 'aussi']
+        has_multiple_tasks = any(indicator in message.lower() for indicator in task_indicators)
         
-        chat = LlmChat(
-            api_key=llm_key,
-            session_id=str(uuid.uuid4()),
-            system_message=system_prompt
-        ).with_model("openai", "gpt-4o-mini")
+        if has_multiple_tasks and len(message.split()) > 5:
+            # Split tasks
+            tasks = re.split(r',|\set\s|\spuis\s|\saprès\s|\sensuite\s|\saussi\s', message)
+            tasks = [t.strip() for t in tasks if len(t.strip()) > 3]
+            
+            if len(tasks) > 1:
+                task_list = "\n".join([f"{i+1}. {task}" for i, task in enumerate(tasks)])
+                return ChatResponse(
+                    response=f"🎯 J'ai détecté {len(tasks)} tâches différentes! Parfait pour ne rien oublier:\n\n{task_list}\n\nVoudrais-tu que je crée un rappel séparé pour chaque tâche? (Spoiler: ton futur toi va adorer! 😊)",
+                    type="multiple_tasks",
+                    suggestions=["Oui, sépare-les!", "Non, juste la première", "Combine tout ensemble"],
+                    parsed_reminders=None
+                )
         
-        # Construct conversation context
-        context = f"Message utilisateur: \"{message}\"\n\n"
-        if history:
-            context += "Historique récent:\n"
-            for h in history[-3:]:  # Last 3 messages
-                context += f"- {h.get('role', 'user')}: {h.get('content', '')}\n"
+        # Check if message is missing date or time
+        has_date = any(word in message.lower() for word in ['demain', 'aujourd\'hui', 'lundi', 'mardi', 'mercredi', 'jeudi', 'vendredi', 'samedi', 'dimanche']) or re.search(r'\d{1,2}[/-]\d{1,2}|\d{1,2}\s+(janvier|février|mars|avril|mai|juin|juillet|août|septembre|octobre|novembre|décembre)', message.lower())
+        has_time = re.search(r'\d{1,2}h\d{0,2}|\d{1,2}:\d{2}', message)
         
-        user_message = UserMessage(text=context)
-        response = await chat.send_message(user_message)
+        if not has_date or not has_time:
+            missing = []
+            if not has_date:
+                missing.append("la date")
+            if not has_time:
+                missing.append("l'heure")
+            
+            missing_str = " et ".join(missing)
+            
+            # Generate smart suggestions
+            suggestions = []
+            if not has_date:
+                tomorrow = (today + timedelta(days=1)).strftime("%A %d %B")
+                suggestions = [
+                    f"Demain ({tomorrow})",
+                    f"Aujourd'hui ({today_str})",
+                    "Dans 2 jours"
+                ]
+            elif not has_time:
+                suggestions = ["9h00 (matin)", "14h00 (après-midi)", "18h00 (soir)"]
+            
+            return ChatResponse(
+                response=f"Hmm, il me manque {missing_str} pour ce rappel! 🤔\nQuand veux-tu que je te rappelle ça?",
+                type="question",
+                suggestions=suggestions,
+                parsed_reminders=None
+            )
         
-        logger.info(f"Chat AI Response: {response}")
+        # If we have all info, parse and confirm
+        parsed = await parse_natural_language_message(message)
         
-        # Parse JSON response
-        import re
-        response_text = str(response).strip()
-        response_text = re.sub(r'```json\s*', '', response_text)
-        response_text = re.sub(r'```\s*', '', response_text)
-        response_text = response_text.strip()
+        encouragements = [
+            "Super! Je m'en occupe! 🚀",
+            "Top! Ton futur toi va te remercier! 😊",
+            "Excellent! Une tâche de moins à oublier! ✨",
+            "Génial! Je garde ça en mémoire pour toi! 💪"
+        ]
+        import random
         
-        json_match = re.search(r'\{[^{}]*(?:\{[^{}]*\}[^{}]*)*\}', response_text, re.DOTALL)
-        if json_match:
-            response_text = json_match.group(0)
-        
-        parsed_response = json.loads(response_text)
-        return ChatResponse(**parsed_response)
+        return ChatResponse(
+            response=f"{random.choice(encouragements)}\n\nRappel: {parsed.title}\nDate: {parsed.date} à {parsed.time}",
+            type="confirmation",
+            suggestions=["Confirmer", "Modifier l'heure", "Annuler"],
+            parsed_reminders=[parsed]
+        )
         
     except Exception as e:
         logger.error(f"Chat assistant error: {str(e)}")
-        # Fallback response
         return ChatResponse(
             response="Oups, mon cerveau TDAH a bug! 😅 Peux-tu reformuler ta demande?",
             type="question",
-            suggestions=None
+            suggestions=["Aide-moi", "Réessayer", "Commencer simple"],
+            parsed_reminders=None
         )
 
 
