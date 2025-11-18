@@ -114,41 +114,33 @@ class ChatResponse(BaseModel):
 async def parse_natural_language_message(message: str) -> ParsedReminder:
     """Parse a natural language message to extract reminder information"""
     try:
-        llm_key = os.environ.get('EMERGENT_LLM_KEY')
-        if not llm_key:
-            raise ValueError("EMERGENT_LLM_KEY not found in environment")
-        
         from datetime import datetime, timedelta
         import json
+        import re
         
         today = datetime.now()
-        today_str = today.strftime("%A %d %B %Y")  # e.g., "lundi 18 novembre 2024"
+        today_str = today.strftime("%A %d %B %Y")
         now_str = today.strftime("%H:%M")
         
-        system_prompt = f"""Tu es un assistant spécialisé dans l'extraction d'informations de rappels depuis des messages en français.
+        system_prompt = f"""Tu es un expert en extraction d'informations de rappels en français.
 
-CONTEXTE TEMPOREL:
+CONTEXTE:
 - Aujourd'hui: {today_str}
-- Heure actuelle: {now_str}
+- Heure: {now_str}
 - Année: {today.year}
 
-INSTRUCTIONS:
-1. Extrais le titre du rappel (l'action principale)
-2. Extrais la description si présente (détails optionnels)
-3. Convertis TOUTES les dates relatives en dates absolues (format: YYYY-MM-DD)
-   - "demain" = {(today + timedelta(days=1)).strftime("%Y-%m-%d")}
-   - "dans 2 jours" = {(today + timedelta(days=2)).strftime("%Y-%m-%d")}
-4. Si l'heure est spécifiée, extrais-la au format HH:MM
-5. Si l'heure n'est PAS spécifiée, marque is_ambiguous=true
-6. Crée datetime_iso en combinant date et heure au format ISO 8601 avec timezone +01:00
-
-RÉPONDS UNIQUEMENT AVEC UN OBJET JSON, SANS TEXTE AVANT OU APRÈS:"""
+RÈGLES:
+1. Extrais le titre (action principale)
+2. Convertis dates relatives en absolues
+3. Format: YYYY-MM-DD pour date, HH:MM pour heure
+4. datetime_iso: format ISO 8601 avec +01:00
+5. RÉPONDS EN JSON PUR"""
         
         user_prompt = f"""Message: "{message}"
 
-Retourne UN SEUL objet JSON avec cette structure exacte:
+JSON:
 {{
-  "title": "action principale",
+  "title": "action",
   "description": null,
   "date": "YYYY-MM-DD",
   "time": "HH:MM",
@@ -158,43 +150,28 @@ Retourne UN SEUL objet JSON avec cette structure exacte:
   "ambiguity_reason": null
 }}"""
         
-        chat = LlmChat(
-            api_key=llm_key,
-            session_id=str(uuid.uuid4()),
-            system_message=system_prompt
-        ).with_model("openai", "gpt-4o-mini")
+        response = await openai_client.chat.completions.create(
+            model="gpt-4o",  # Le meilleur modèle d'OpenAI
+            messages=[
+                {"role": "system", "content": system_prompt},
+                {"role": "user", "content": user_prompt}
+            ],
+            temperature=0.1,
+            response_format={"type": "json_object"}
+        )
         
-        user_message = UserMessage(text=user_prompt)
-        response = await chat.send_message(user_message)
-        
-        logger.info(f"LLM Raw Response: {response}")
-        
-        # Parse the JSON response
-        import re
-        
-        response_text = str(response).strip()
-        
-        # Remove markdown code blocks
-        response_text = re.sub(r'```json\s*', '', response_text)
-        response_text = re.sub(r'```\s*', '', response_text)
-        response_text = response_text.strip()
-        
-        # Try to find JSON object in the response
-        json_match = re.search(r'\{[^{}]*(?:\{[^{}]*\}[^{}]*)*\}', response_text, re.DOTALL)
-        if json_match:
-            response_text = json_match.group(0)
-        
-        logger.info(f"Cleaned JSON: {response_text}")
+        response_text = response.choices[0].message.content.strip()
+        logger.info(f"OpenAI Response: {response_text}")
         
         parsed_data = json.loads(response_text)
         return ParsedReminder(**parsed_data)
         
     except json.JSONDecodeError as e:
-        logger.error(f"JSON decode error: {str(e)}, Response: {response_text}")
-        raise HTTPException(status_code=500, detail=f"Erreur de décodage JSON: {str(e)}")
+        logger.error(f"JSON decode error: {str(e)}")
+        raise HTTPException(status_code=500, detail=f"Erreur JSON: {str(e)}")
     except Exception as e:
-        logger.error(f"Error parsing message: {str(e)}")
-        raise HTTPException(status_code=500, detail=f"Erreur lors du parsing: {str(e)}")
+        logger.error(f"Error parsing: {str(e)}")
+        raise HTTPException(status_code=500, detail=f"Erreur parsing: {str(e)}")
 
 
 # Intelligent Chatbot Service for ADHD users
