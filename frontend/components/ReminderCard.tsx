@@ -4,6 +4,7 @@ import { Ionicons } from '@expo/vector-icons';
 import { format, parseISO } from 'date-fns';
 import { fr } from 'date-fns/locale';
 import { Reminder } from '../types';
+import { COLORS } from '../constants/theme';
 
 interface ReminderCardProps {
   reminder: Reminder;
@@ -21,7 +22,13 @@ export const ReminderCard: React.FC<ReminderCardProps> = ({
   const isPast = dateTime < new Date() && !isCompleted;
 
   return (
-    <View style={[styles.card, isCompleted && styles.cardCompleted, isPast && styles.cardPast]}>
+    <View
+      style={[
+        styles.card,
+        isCompleted && styles.cardCompleted,
+        isPast && styles.cardPast,
+      ]}
+    >
       <TouchableOpacity
         style={styles.checkbox}
         onPress={onToggleStatus}
@@ -30,7 +37,7 @@ export const ReminderCard: React.FC<ReminderCardProps> = ({
         <Ionicons
           name={isCompleted ? 'checkmark-circle' : 'ellipse-outline'}
           size={28}
-          color={isCompleted ? '#10b981' : '#6b7280'}
+          color={isCompleted ? COLORS.status.success : COLORS.neon.cyan}
         />
       </TouchableOpacity>
 
@@ -42,9 +49,20 @@ export const ReminderCard: React.FC<ReminderCardProps> = ({
           <Text style={styles.description}>{reminder.description}</Text>
         )}
         <View style={styles.dateTimeRow}>
-          <Ionicons name="time-outline" size={16} color="#6b7280" />
+          <Ionicons name="time-outline" size={16} color={COLORS.neon.magenta} />
           <Text style={styles.dateTime}>
             {format(dateTime, "EEEE d MMMM 'à' HH:mm", { locale: fr })}
+          </Text>
+        </View>
+        <View style={styles.statusBadge}>
+          <View
+            style={[
+              styles.statusDot,
+              { backgroundColor: isCompleted ? COLORS.status.success : COLORS.neon.cyan },
+            ]}
+          />
+          <Text style={styles.statusText}>
+            {isCompleted ? 'COMPLÉTÉ' : isPast ? 'EN RETARD' : 'ACTIF'}
           </Text>
         </View>
       </View>
@@ -54,7 +72,7 @@ export const ReminderCard: React.FC<ReminderCardProps> = ({
         onPress={onDelete}
         activeOpacity={0.7}
       >
-        <Ionicons name="trash-outline" size={22} color="#ef4444" />
+        <Ionicons name="trash-outline" size={22} color={COLORS.status.error} />
       </TouchableOpacity>
     </View>
   );
@@ -62,25 +80,22 @@ export const ReminderCard: React.FC<ReminderCardProps> = ({
 
 const styles = StyleSheet.create({
   card: {
-    backgroundColor: '#ffffff',
-    borderRadius: 16,
+    backgroundColor: COLORS.background.card,
+    borderRadius: 8,
     padding: 16,
     marginBottom: 12,
     flexDirection: 'row',
     alignItems: 'flex-start',
-    shadowColor: '#000',
-    shadowOffset: { width: 0, height: 2 },
-    shadowOpacity: 0.1,
-    shadowRadius: 4,
-    elevation: 3,
+    borderWidth: 1,
+    borderColor: COLORS.neon.cyan + '40',
   },
   cardCompleted: {
-    backgroundColor: '#f0fdf4',
-    opacity: 0.7,
+    opacity: 0.6,
+    borderColor: COLORS.status.success + '40',
   },
   cardPast: {
-    borderLeftWidth: 4,
-    borderLeftColor: '#f59e0b',
+    borderColor: COLORS.status.warning,
+    borderLeftWidth: 3,
   },
   checkbox: {
     marginRight: 12,
@@ -92,26 +107,44 @@ const styles = StyleSheet.create({
   title: {
     fontSize: 16,
     fontWeight: '600',
-    color: '#111827',
+    color: COLORS.text.primary,
     marginBottom: 4,
   },
   titleCompleted: {
     textDecorationLine: 'line-through',
-    color: '#6b7280',
+    color: COLORS.text.secondary,
   },
   description: {
     fontSize: 14,
-    color: '#6b7280',
+    color: COLORS.text.secondary,
     marginBottom: 8,
   },
   dateTimeRow: {
     flexDirection: 'row',
     alignItems: 'center',
     gap: 6,
+    marginBottom: 8,
   },
   dateTime: {
-    fontSize: 14,
-    color: '#6b7280',
+    fontSize: 13,
+    color: COLORS.text.secondary,
+    fontFamily: 'monospace',
+  },
+  statusBadge: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 6,
+  },
+  statusDot: {
+    width: 8,
+    height: 8,
+    borderRadius: 4,
+  },
+  statusText: {
+    fontSize: 11,
+    fontWeight: '700',
+    color: COLORS.neon.cyan,
+    letterSpacing: 1,
   },
   deleteButton: {
     padding: 4,

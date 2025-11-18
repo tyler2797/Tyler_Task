@@ -12,6 +12,7 @@ import { Ionicons } from '@expo/vector-icons';
 import { ParsedReminder } from '../types';
 import { format, parseISO } from 'date-fns';
 import { fr } from 'date-fns/locale';
+import { COLORS } from '../constants/theme';
 
 interface ConfirmationModalProps {
   visible: boolean;
@@ -44,29 +45,28 @@ export const ConfirmationModal: React.FC<ConfirmationModalProps> = ({
         <View style={styles.modalContainer}>
           <View style={styles.modal}>
             <View style={styles.header}>
-              <Ionicons name="checkmark-circle" size={40} color="#10b981" />
-              <Text style={styles.headerText}>Confirmer le rappel ?</Text>
+              <View style={styles.glitchLine} />
+              <Ionicons name="alert-circle" size={40} color={COLORS.neon.cyan} />
+              <Text style={styles.headerText}>CONFIRMATION</Text>
+              <View style={styles.glitchLine} />
             </View>
 
             <View style={styles.content}>
               <View style={styles.infoRow}>
-                <Ionicons name="pencil" size={20} color="#6b7280" />
-                <Text style={styles.label}>Titre:</Text>
+                <Text style={styles.label}>// TITRE</Text>
                 <Text style={styles.value}>{parsed.title}</Text>
               </View>
 
               {parsed.description && (
                 <View style={styles.infoRow}>
-                  <Ionicons name="document-text" size={20} color="#6b7280" />
-                  <Text style={styles.label}>Description:</Text>
+                  <Text style={styles.label}>// DESCRIPTION</Text>
                   <Text style={styles.value}>{parsed.description}</Text>
                 </View>
               )}
 
               {dateTime && (
                 <View style={styles.infoRow}>
-                  <Ionicons name="time" size={20} color="#6b7280" />
-                  <Text style={styles.label}>Date & Heure:</Text>
+                  <Text style={styles.label}>// HORODATAGE</Text>
                   <Text style={styles.value}>
                     {format(dateTime, "EEEE d MMMM yyyy 'à' HH:mm", {
                       locale: fr,
@@ -77,7 +77,7 @@ export const ConfirmationModal: React.FC<ConfirmationModalProps> = ({
 
               {parsed.is_ambiguous && (
                 <View style={styles.warningBox}>
-                  <Ionicons name="warning" size={20} color="#f59e0b" />
+                  <Ionicons name="warning" size={20} color={COLORS.status.warning} />
                   <Text style={styles.warningText}>
                     {parsed.ambiguity_reason || 'Certaines informations ne sont pas claires'}
                   </Text>
@@ -91,7 +91,7 @@ export const ConfirmationModal: React.FC<ConfirmationModalProps> = ({
                 onPress={onCancel}
                 activeOpacity={0.8}
               >
-                <Text style={styles.cancelButtonText}>Annuler</Text>
+                <Text style={styles.cancelButtonText}>ANNULER</Text>
               </TouchableOpacity>
 
               <TouchableOpacity
@@ -99,7 +99,7 @@ export const ConfirmationModal: React.FC<ConfirmationModalProps> = ({
                 onPress={onConfirm}
                 activeOpacity={0.8}
               >
-                <Text style={styles.confirmButtonText}>Confirmer</Text>
+                <Text style={styles.confirmButtonText}>EXÉCUTER</Text>
               </TouchableOpacity>
             </View>
           </View>
@@ -112,7 +112,7 @@ export const ConfirmationModal: React.FC<ConfirmationModalProps> = ({
 const styles = StyleSheet.create({
   overlay: {
     flex: 1,
-    backgroundColor: 'rgba(0, 0, 0, 0.5)',
+    backgroundColor: 'rgba(0, 0, 0, 0.85)',
     justifyContent: 'center',
     alignItems: 'center',
   },
@@ -121,58 +121,63 @@ const styles = StyleSheet.create({
     maxWidth: 400,
   },
   modal: {
-    backgroundColor: '#ffffff',
-    borderRadius: 20,
+    backgroundColor: COLORS.background.card,
+    borderRadius: 12,
     padding: 24,
-    shadowColor: '#000',
-    shadowOffset: { width: 0, height: 4 },
-    shadowOpacity: 0.3,
-    shadowRadius: 8,
-    elevation: 8,
+    borderWidth: 2,
+    borderColor: COLORS.neon.cyan + '80',
   },
   header: {
     alignItems: 'center',
     marginBottom: 24,
   },
+  glitchLine: {
+    width: 100,
+    height: 2,
+    backgroundColor: COLORS.neon.cyan,
+    marginVertical: 8,
+  },
   headerText: {
     fontSize: 20,
     fontWeight: '700',
-    color: '#111827',
-    marginTop: 12,
+    color: COLORS.neon.cyan,
+    marginVertical: 8,
+    letterSpacing: 3,
   },
   content: {
     marginBottom: 24,
   },
   infoRow: {
-    flexDirection: 'row',
-    alignItems: 'flex-start',
     marginBottom: 16,
-    gap: 8,
   },
   label: {
-    fontSize: 14,
-    fontWeight: '600',
-    color: '#374151',
-    minWidth: 80,
+    fontSize: 12,
+    fontWeight: '700',
+    color: COLORS.neon.magenta,
+    marginBottom: 4,
+    letterSpacing: 1,
+    fontFamily: 'monospace',
   },
   value: {
-    flex: 1,
-    fontSize: 14,
-    color: '#111827',
+    fontSize: 15,
+    color: COLORS.text.primary,
+    lineHeight: 22,
   },
   warningBox: {
     flexDirection: 'row',
     alignItems: 'flex-start',
-    backgroundColor: '#fef3c7',
+    backgroundColor: COLORS.background.secondary,
     padding: 12,
-    borderRadius: 12,
+    borderRadius: 8,
     marginTop: 8,
     gap: 8,
+    borderWidth: 1,
+    borderColor: COLORS.status.warning + '40',
   },
   warningText: {
     flex: 1,
     fontSize: 13,
-    color: '#92400e',
+    color: COLORS.status.warning,
   },
   buttons: {
     flexDirection: 'row',
@@ -181,23 +186,28 @@ const styles = StyleSheet.create({
   button: {
     flex: 1,
     paddingVertical: 14,
-    borderRadius: 12,
+    borderRadius: 8,
     alignItems: 'center',
+    borderWidth: 1,
   },
   cancelButton: {
-    backgroundColor: '#f3f4f6',
+    backgroundColor: COLORS.background.secondary,
+    borderColor: COLORS.text.muted + '40',
   },
   confirmButton: {
-    backgroundColor: '#3b82f6',
+    backgroundColor: COLORS.neon.cyan,
+    borderColor: COLORS.neon.cyan,
   },
   cancelButtonText: {
-    fontSize: 16,
-    fontWeight: '600',
-    color: '#374151',
+    fontSize: 14,
+    fontWeight: '700',
+    color: COLORS.text.secondary,
+    letterSpacing: 1,
   },
   confirmButtonText: {
-    fontSize: 16,
-    fontWeight: '600',
-    color: '#ffffff',
+    fontSize: 14,
+    fontWeight: '700',
+    color: COLORS.background.primary,
+    letterSpacing: 1,
   },
 });
