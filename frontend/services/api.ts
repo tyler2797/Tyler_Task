@@ -12,6 +12,21 @@ const api = axios.create({
   },
 });
 
+export interface ChatResponse {
+  response: string;
+  type: 'question' | 'suggestion' | 'confirmation' | 'multiple_tasks';
+  suggestions: string[] | null;
+  parsed_reminders: ParsedReminder[] | null;
+}
+
+export const chatWithAssistant = async (
+  message: string,
+  conversation_history: Array<{ role: string; content: string }>
+): Promise<ChatResponse> => {
+  const response = await api.post('/chat', { message, conversation_history });
+  return response.data;
+};
+
 export const parseMessage = async (message: string): Promise<ParsedReminder> => {
   const response = await api.post('/parse-message', { message });
   return response.data;
