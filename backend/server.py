@@ -209,54 +209,122 @@ async def intelligent_chat_assistant(message: str, history: List[dict] = []) -> 
         today = datetime.now()
         today_str = today.strftime("%A %d %B %Y")
         now_str = today.strftime("%H:%M")
+        tomorrow = (today + timedelta(days=1)).strftime("%Y-%m-%d")
+        
+        # Reconstruct context from history
+        context_info = {
+            "task": None,
+            "date": None,
+            "time": None,
+            "waiting_for": None
+        }
+        
+        # Parse history to understand what we're waiting for
+        if history:
+            last_messages = history[-4:]  # Last 4 messages
+            full_context = " ".join([h.get('content', '') for h in last_messages])
+            
+            # Extract task from first user message
+            for h in history:
+                if h.get('role') == 'user':
+                    # Extract potential task name
+                    task_words = h.get('content', '').lower()
+                    if any(word in task_words for word in ['rappel', 'appel', 'rdv', 'rendez-vous', 'médecin', 'dentiste', 'courses']):
+                        context_info["task"] = h.get('content', '')
+                        break
+            
+            # Check if we asked for date or time
+            for h in reversed(history[-2:]):
+                content = h.get('content', '').lower()
+                if 'manque la date' in content or 'quelle date' in content or 'c\'est quand' in content:
+                    context_info["waiting_for"] = "date"
+                elif 'manque l\'heure' in content or 'quelle heure' in content or 'à quelle heure' in content:
+                    context_info["waiting_for"] = "time"
+                
+                # Extract date if present
+                if 'demain' in content:
+                    context_info["date"] = tomorrow
+                elif re.search(r'\d{4}-\d{2}-\d{2}', content):
+                    date_match = re.search(r'\d{4}-\d{2}-\d{2}', content)
+                    context_info["date"] = date_match.group(0)
+        
+        # If user is answering with just time (like "14h")
+        if context_info["waiting_for"] == "time" and re.match(r'^\d{1,2}h?\d{0,2}$', message.strip()):
+            # User is giving just the time
+            time_str = message.strip()
+            if not 'h' in time_str and not ':' in time_str:
+                time_str = time_str + "h00"
+            elif 'h' in time_str and len(time_str.split('h')[1]) == 0:
+                time_str = time_str + "00"
+            
+            # Reconstruct full message
+            full_message = f"{context_info['task']} {time_str}"
+            if context_info["date"]:
+                # We have date from history, now we have time
+                parsed = await parse_natural_language_message(full_message)
+                
+                encouragements = [
+                    "Parfait! C'est noté! 🚀",
+                    "Super! Ton rappel est prêt! 😊",
+                    "Excellent! Je m'en souviens pour toi! ✨"
+                ]
+                import random
+                
+                return ChatResponse(
+                    response=f"{random.choice(encouragements)}\n\n📝 Rappel: {parsed.title}\n📅 Date: {parsed.date}\n⏰ Heure: {parsed.time}",
+                    type="confirmation",
+                    suggestions=["Créer ce rappel", "Modifier", "Annuler"],
+                    parsed_reminders=[parsed]
+                )
+        
+        # If user is answering with just date (like "demain")
+        if context_info["waiting_for"] == "date" and len(message.split()) <= 2:
+            if any(word in message.lower() for word in ['demain', 'aujourd\'hui', 'lundi', 'mardi']):
+                context_info["date"] = message
+                
+                # Now ask for time
+                return ChatResponse(
+                    response=f"Cool! {message.capitalize()}. Et à quelle heure? ⏰",
+                    type="question",
+                    suggestions=["9h00", "14h00", "18h00"],
+                    parsed_reminders=None
+                )
         
         # Detect multiple tasks first
         task_indicators = ['et', ',', 'puis', 'après', 'ensuite', 'aussi']
         has_multiple_tasks = any(indicator in message.lower() for indicator in task_indicators)
         
         if has_multiple_tasks and len(message.split()) > 5:
-            # Split tasks
             tasks = re.split(r',|\set\s|\spuis\s|\saprès\s|\sensuite\s|\saussi\s', message)
             tasks = [t.strip() for t in tasks if len(t.strip()) > 3]
             
             if len(tasks) > 1:
-                task_list = "\n".join([f"{i+1}. {task}" for i, task in enumerate(tasks)])
+                task_list = "\n".join([f"• {task}" for task in tasks])
                 return ChatResponse(
-                    response=f"🎯 J'ai détecté {len(tasks)} tâches différentes! Parfait pour ne rien oublier:\n\n{task_list}\n\nVoudrais-tu que je crée un rappel séparé pour chaque tâche? (Spoiler: ton futur toi va adorer! 😊)",
+                    response=f"🎯 J'ai repéré {len(tasks)} tâches! Parfait:\n\n{task_list}\n\nJe crée un rappel pour chacune? (Ton futur toi va adorer! 😊)",
                     type="multiple_tasks",
-                    suggestions=["Oui, sépare-les!", "Non, juste la première", "Combine tout ensemble"],
+                    suggestions=["Oui!", "Non, juste la 1ère", "Combine-les"],
                     parsed_reminders=None
                 )
         
-        # Check if message is missing date or time
-        has_date = any(word in message.lower() for word in ['demain', 'aujourd\'hui', 'lundi', 'mardi', 'mercredi', 'jeudi', 'vendredi', 'samedi', 'dimanche']) or re.search(r'\d{1,2}[/-]\d{1,2}|\d{1,2}\s+(janvier|février|mars|avril|mai|juin|juillet|août|septembre|octobre|novembre|décembre)', message.lower())
+        # Check what's missing in current message
+        has_date = any(word in message.lower() for word in ['demain', 'aujourd\'hui', 'lundi', 'mardi', 'mercredi', 'jeudi', 'vendredi', 'samedi', 'dimanche']) or re.search(r'\d{1,2}[/-]\d{1,2}', message.lower())
         has_time = re.search(r'\d{1,2}h\d{0,2}|\d{1,2}:\d{2}', message)
         
-        if not has_date or not has_time:
-            missing = []
-            if not has_date:
-                missing.append("la date")
-            if not has_time:
-                missing.append("l'heure")
-            
-            missing_str = " et ".join(missing)
-            
-            # Generate smart suggestions
-            suggestions = []
-            if not has_date:
-                tomorrow = (today + timedelta(days=1)).strftime("%A %d %B")
-                suggestions = [
-                    f"Demain ({tomorrow})",
-                    f"Aujourd'hui ({today_str})",
-                    "Dans 2 jours"
-                ]
-            elif not has_time:
-                suggestions = ["9h00 (matin)", "14h00 (après-midi)", "18h00 (soir)"]
-            
+        if not has_date:
+            tomorrow_str = (today + timedelta(days=1)).strftime("%A %d %B")
             return ChatResponse(
-                response=f"Hmm, il me manque {missing_str} pour ce rappel! 🤔\nQuand veux-tu que je te rappelle ça?",
+                response=f"Ok! Pour '{message}', c'est pour quand? 📅",
                 type="question",
-                suggestions=suggestions,
+                suggestions=[f"Demain ({tomorrow_str})", "Aujourd'hui", "Dans 2 jours"],
+                parsed_reminders=None
+            )
+        
+        if not has_time:
+            return ChatResponse(
+                response="Et à quelle heure? ⏰",
+                type="question",
+                suggestions=["9h00", "14h00", "18h00"],
                 parsed_reminders=None
             )
         
@@ -264,26 +332,25 @@ async def intelligent_chat_assistant(message: str, history: List[dict] = []) -> 
         parsed = await parse_natural_language_message(message)
         
         encouragements = [
-            "Super! Je m'en occupe! 🚀",
-            "Top! Ton futur toi va te remercier! 😊",
-            "Excellent! Une tâche de moins à oublier! ✨",
-            "Génial! Je garde ça en mémoire pour toi! 💪"
+            "Parfait! C'est dans la boîte! 🚀",
+            "Top! Je garde ça en tête! 😊",
+            "Excellent! Une chose de moins à oublier! ✨"
         ]
         import random
         
         return ChatResponse(
-            response=f"{random.choice(encouragements)}\n\nRappel: {parsed.title}\nDate: {parsed.date} à {parsed.time}",
+            response=f"{random.choice(encouragements)}\n\n📝 {parsed.title}\n📅 {parsed.date}\n⏰ {parsed.time}",
             type="confirmation",
-            suggestions=["Confirmer", "Modifier l'heure", "Annuler"],
+            suggestions=["Créer ce rappel", "Modifier", "Annuler"],
             parsed_reminders=[parsed]
         )
         
     except Exception as e:
         logger.error(f"Chat assistant error: {str(e)}")
         return ChatResponse(
-            response="Oups, mon cerveau TDAH a bug! 😅 Peux-tu reformuler ta demande?",
+            response="Oups! 😅 Peux-tu reformuler?",
             type="question",
-            suggestions=["Aide-moi", "Réessayer", "Commencer simple"],
+            suggestions=["Réessayer", "Aide"],
             parsed_reminders=None
         )
 
