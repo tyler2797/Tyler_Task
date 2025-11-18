@@ -54,9 +54,9 @@ export const ChatSection: React.FC<ChatSectionProps> = ({
       >
         {messages.length === 0 && (
           <View style={styles.emptyState}>
-            <Text style={styles.emptyText}>// Créez votre premier rappel</Text>
+            <Text style={styles.emptyText}>💫 Rappels pour les TDAH</Text>
             <Text style={styles.emptySubtext}>
-              Ex: "demain 15h appeler Paul"
+              Votre assistant IA qui n'oublie jamais rien (contrairement à nous 😅)
             </Text>
           </View>
         )}
