@@ -33,7 +33,8 @@ export const parseMessage = async (message: string): Promise<ParsedReminder> => 
 };
 
 export const createReminder = async (reminder: ReminderCreate): Promise<Reminder> => {
-  const response = await api.post('/reminders', reminder);
+  // Timeout plus long pour gérer le cold start de Render (plan gratuit)
+  const response = await api.post('/reminders', reminder, { timeout: 60000 });
   return response.data;
 };
 
