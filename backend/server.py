@@ -151,7 +151,7 @@ JSON:
 }}"""
         
         response = await openai_client.chat.completions.create(
-            model="gpt-4o",  # Le meilleur modèle d'OpenAI
+            model="gpt-5.1",  # Le meilleur modèle d'OpenAI (Mise à jour demandée)
             messages=[
                 {"role": "system", "content": system_prompt},
                 {"role": "user", "content": user_prompt}
@@ -178,6 +178,8 @@ JSON:
 async def intelligent_chat_assistant(message: str, history: List[dict] = []) -> ChatResponse:
     """Assistant IA conversationnel pour aider les utilisateurs TDAH"""
     try:
+        logger.info(f"📨 Message reçu: '{message}'")
+        logger.info(f"📚 Historique ({len(history)} messages): {history}")
         llm_key = os.environ.get('EMERGENT_LLM_KEY')
         if not llm_key:
             raise ValueError("EMERGENT_LLM_KEY not found in environment")
@@ -237,10 +239,10 @@ async def intelligent_chat_assistant(message: str, history: List[dict] = []) -> 
             elif 'h' in time_str and len(time_str.split('h')[1]) == 0:
                 time_str = time_str + "00"
             
-            # Reconstruct full message
-            full_message = f"{context_info['task']} {time_str}"
-            if context_info["date"]:
-                # We have date from history, now we have time
+            # Reconstruct full message with task, date AND time
+            if context_info["task"] and context_info["date"]:
+                # We have all info: task + date + time
+                full_message = f"{context_info['task']} {context_info['date']} {time_str}"
                 parsed = await parse_natural_language_message(full_message)
                 
                 encouragements = [
@@ -256,6 +258,7 @@ async def intelligent_chat_assistant(message: str, history: List[dict] = []) -> 
                     suggestions=["Créer ce rappel", "Modifier", "Annuler"],
                     parsed_reminders=[parsed]
                 )
+
         
         # If user is answering with just date (like "demain")
         if context_info["waiting_for"] == "date" and len(message.split()) <= 2:

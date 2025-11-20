@@ -120,34 +120,38 @@ export default function Index() {
 
     const userMessage = message;
     addChatMessage('user', userMessage);
-    
-    // Add to conversation history
-    setConversationHistory((prev) => [...prev, { role: 'user', content: userMessage }]);
+
+    // Create updated history with current message BEFORE API call
+    const updatedHistory = [...conversationHistory, { role: 'user', content: userMessage }];
+
+    // Update conversation history state
+    setConversationHistory(updatedHistory);
 
     setMessage('');
     setLoading(true);
-    
+
     try {
-      const chatResponse = await api.chatWithAssistant(userMessage, conversationHistory);
-      
+      // Send the UPDATED history to the backend
+      const chatResponse = await api.chatWithAssistant(userMessage, updatedHistory);
+
       // Add assistant response to chat
       addChatMessage('assistant', chatResponse.response, chatResponse.suggestions || undefined);
-      
-      // Update conversation history
+
+      // Update conversation history with assistant response
       setConversationHistory((prev) => [
         ...prev,
         { role: 'assistant', content: chatResponse.response },
       ]);
-      
+
       // Set current suggestions
       setCurrentSuggestions(chatResponse.suggestions);
-      
+
       // If we have parsed reminders, show confirmation
       if (chatResponse.parsed_reminders && chatResponse.parsed_reminders.length > 0) {
         setParsedReminder(chatResponse.parsed_reminders[0]);
         setShowConfirmation(true);
       }
-      
+
     } catch (error: any) {
       addChatMessage('assistant', `❌ Erreur: ${error.message || 'Impossible de communiquer avec l\'assistant'}`);
       Alert.alert('Erreur', error.message || 'Impossible de communiquer avec l\'assistant');
