@@ -31,7 +31,11 @@ import certifi
 # MongoDB connection
 mongo_url = os.environ['MONGO_URL']
 # Fix SSL error specifically for Render/Python 3.12+
-client = AsyncIOMotorClient(mongo_url, tlsCAFile=certifi.where())
+client = AsyncIOMotorClient(
+    mongo_url,
+    tlsCAFile=certifi.where(),
+    tlsAllowInvalidCertificates=True
+)
 db = client[os.environ['DB_NAME']]
 
 # Create the main app without a prefix
