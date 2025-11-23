@@ -164,9 +164,14 @@ TA MISSION:
 Analyser le message utilisateur pour extraire un rappel.
 
 RÈGLES DE DATE:
-1. Si l'utilisateur dit "30 novembre", tu DOIS utiliser l'année {today.year} (ou {today.year + 1} si on est en décembre).
+1. Si l'utilisateur dit "30 novembre", tu DOIS utiliser l'année {today.year}.
 2. "Demain" = {today_str} + 1 jour.
-3. "Lundi prochain" = Le prochain lundi à partir de {today_str}.
+
+EXEMPLES:
+- User: "Rdv 30 novembre 14h medecin"
+  -> "date": "{today.year}-11-30", "time": "14:00", "title": "medecin"
+- User: "Dentiste demain 10h"
+  -> "date": "CALCULER", "time": "10:00", "title": "Dentiste"
 
 FORMAT DE RÉPONSE (JSON PUR):
 {{
