@@ -11,9 +11,20 @@ import uuid
 from datetime import datetime
 from openai import AsyncOpenAI
 from bson import ObjectId
+import sys
 
 ROOT_DIR = Path(__file__).parent
 load_dotenv(ROOT_DIR / '.env')
+
+# Configure logging first to ensure we capture startup logs
+logging.basicConfig(
+    level=logging.INFO,
+    format='%(asctime)s - %(name)s - %(levelname)s - %(message)s',
+)
+logger = logging.getLogger(__name__)
+
+logger.info(f"🚀 Starting backend with Python version: {sys.version}")
+
 
 import certifi
 
@@ -29,12 +40,7 @@ app = FastAPI()
 # Create a router with the /api prefix
 api_router = APIRouter(prefix="/api")
 
-# Configure logging
-logging.basicConfig(
-    level=logging.INFO,
-    format='%(asctime)s - %(name)s - %(levelname)s - %(message)s'
-)
-logger = logging.getLogger(__name__)
+
 
 # Initialize OpenAI client
 openai_client = AsyncOpenAI(api_key=os.environ.get('OPENAI_API_KEY'))
