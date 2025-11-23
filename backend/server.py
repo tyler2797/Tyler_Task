@@ -153,23 +153,24 @@ async def parse_natural_language_message(message: str) -> ParsedReminder:
         
         system_prompt = f"""Tu es un expert en extraction d'informations de rappels en français.
 
-CONTEXTE:
-- Aujourd'hui: {today_str}
-- Heure: {now_str} (Paris)
+
+
+CONTEXTE TEMPOREL:
+- Nous sommes le: {today_str}
+- Il est: {now_str} (Paris)
 - Année: {today.year}
 
-RÈGLES:
-1. Extrais le titre (action principale)
-2. Convertis dates relatives en absolues
-3. Format: YYYY-MM-DD pour date, HH:MM pour heure
-4. datetime_iso: format ISO 8601 avec +01:00
-5. RÉPONDS EN JSON PUR"""
-        
-        user_prompt = f"""Message: "{message}"
+TA MISSION:
+Analyser le message utilisateur pour extraire un rappel.
 
-JSON:
+RÈGLES DE DATE:
+1. Si l'utilisateur dit "30 novembre", tu DOIS utiliser l'année {today.year} (ou {today.year + 1} si on est en décembre).
+2. "Demain" = {today_str} + 1 jour.
+3. "Lundi prochain" = Le prochain lundi à partir de {today_str}.
+
+FORMAT DE RÉPONSE (JSON PUR):
 {{
-  "title": "action",
+  "title": "action à faire",
   "description": null,
   "date": "YYYY-MM-DD",
   "time": "HH:MM",
@@ -179,8 +180,12 @@ JSON:
   "ambiguity_reason": null
 }}"""
         
+        user_prompt = f"""Message: "{message}"
+
+JSON:"""
+        
         response = await openai_client.chat.completions.create(
-            model="gpt-5.1",  # Le meilleur modèle d'OpenAI (Mise à jour demandée)
+            model="gpt-4o",  # Utilisation du modèle le plus performant
             messages=[
                 {"role": "system", "content": system_prompt},
                 {"role": "user", "content": user_prompt}
