@@ -131,15 +131,31 @@ async def parse_natural_language_message(message: str) -> ParsedReminder:
         import json
         import re
         
-        today = datetime.now()
-        today_str = today.strftime("%A %d %B %Y")
+        import pytz
+        
+        # Use Paris timezone for context
+        paris_tz = pytz.timezone('Europe/Paris')
+        today = datetime.now(paris_tz)
+        
+        # Manual French date formatting to ensure consistency
+        months_fr = {
+            1: "janvier", 2: "février", 3: "mars", 4: "avril", 5: "mai", 6: "juin",
+            7: "juillet", 8: "août", 9: "septembre", 10: "octobre", 11: "novembre", 12: "décembre"
+        }
+        days_fr = {
+            0: "lundi", 1: "mardi", 2: "mercredi", 3: "jeudi", 4: "vendredi", 5: "samedi", 6: "dimanche"
+        }
+        
+        day_name = days_fr[today.weekday()]
+        month_name = months_fr[today.month]
+        today_str = f"{day_name} {today.day} {month_name} {today.year}"
         now_str = today.strftime("%H:%M")
         
         system_prompt = f"""Tu es un expert en extraction d'informations de rappels en français.
 
 CONTEXTE:
 - Aujourd'hui: {today_str}
-- Heure: {now_str}
+- Heure: {now_str} (Paris)
 - Année: {today.year}
 
 RÈGLES:
@@ -200,9 +216,24 @@ async def intelligent_chat_assistant(message: str, history: List[dict] = []) -> 
         from datetime import datetime, timedelta
         import json
         import re
+        import pytz
         
-        today = datetime.now()
-        today_str = today.strftime("%A %d %B %Y")
+        paris_tz = pytz.timezone('Europe/Paris')
+        today = datetime.now(paris_tz)
+        
+        # Manual French date formatting
+        months_fr = {
+            1: "janvier", 2: "février", 3: "mars", 4: "avril", 5: "mai", 6: "juin",
+            7: "juillet", 8: "août", 9: "septembre", 10: "octobre", 11: "novembre", 12: "décembre"
+        }
+        days_fr = {
+            0: "lundi", 1: "mardi", 2: "mercredi", 3: "jeudi", 4: "vendredi", 5: "samedi", 6: "dimanche"
+        }
+        
+        day_name = days_fr[today.weekday()]
+        month_name = months_fr[today.month]
+        today_str = f"{day_name} {today.day} {month_name} {today.year}"
+
         now_str = today.strftime("%H:%M")
         tomorrow = (today + timedelta(days=1)).strftime("%Y-%m-%d")
         
